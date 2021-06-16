@@ -1,0 +1,21 @@
+{
+    "watchers": [
+        {
+            "watch": "/var/log/nginx.log",
+            "tags": [
+                {
+                    "key": "Type",
+                    "value": "Nginx"
+                }
+            ],
+            "destination": "S3"
+        }
+    ],
+    "server": {
+        "host": "127.0.0.1",
+        "port": 8000
+    },
+    "retry": {
+        "max_retries": 5
+    }
+}
