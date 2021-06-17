@@ -11,9 +11,10 @@ import (
 )
 
 type Watcher struct {
-	FileName    string              `json:"watch"`
-	Tags        []map[string]string `json:"tags"`
-	Destination string              `json:"destination"`
+	FileName      string              `json:"watch"`
+	Tags          []map[string]string `json:"tags"`
+	Destination   string              `json:"destination"`
+	initialOffset int64
 }
 
 type eventHandler struct {
@@ -21,6 +22,9 @@ type eventHandler struct {
 }
 
 func Watch(watcherSource Watcher) {
+
+	fileInfo, _ := os.Stat(watcherSource.FileName)
+	watcherSource.initialOffset = fileInfo.Size()
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -40,7 +44,7 @@ func Watch(watcherSource Watcher) {
 	for {
 		select {
 		case event, _ := <-watcher.Events:
-			go func() { eventChan <- event }()
+			go func(e fsnotify.Event) { eventChan <- e }(event)
 
 		case err, _ := <-watcher.Errors:
 			log.Println("ERROR", err)
@@ -68,8 +72,7 @@ func runEventActions(handler eventHandler, watcherSource Watcher) {
 
 func actionOnWrite(eventName chan string, watcherSource Watcher) {
 	var line string
-	fileInfo, _ := os.Stat(watcherSource.FileName)
-	currentOffset := fileInfo.Size()
+	currentOffset := watcherSource.initialOffset
 	for e := range eventName {
 		line, currentOffset = readLine(e, currentOffset)
 		log.Println(line)
@@ -102,6 +105,7 @@ func readLine(filename string, offset int64) (string, int64) {
 			line = buffer.String()
 			offset = offset + int64(buffer.Len()) + 1
 			buffer.Reset()
+			break
 		}
 	}
 	if err == io.EOF {
