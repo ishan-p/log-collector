@@ -11,13 +11,13 @@ func RunAgent(configFile string) {
 		log.Printf("Watching file %s\n", watcher.FileName)
 		notificationChannel := make(chan string)
 		defer close(notificationChannel)
-		go Watch(watcher.FileName, notificationChannel)
-		go Notify(notificationChannel)
+		go watch(watcher.FileName, notificationChannel)
+		go notify(notificationChannel)
 	}
 	<-done
 }
 
-func Notify(ch chan string) {
+func notify(ch chan string) {
 	for notification := range ch {
 		log.Println(notification)
 	}

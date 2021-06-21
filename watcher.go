@@ -13,7 +13,7 @@ type Watcher struct {
 	Destination string              `json:"destination"`
 }
 
-func Watch(fileName string, notificationChannel chan string) {
+func watch(fileName string, notificationChannel chan string) {
 	seekInfo := getOffset(fileName)
 	t, err := tail.TailFile(fileName, tail.Config{
 		Follow:   true,
