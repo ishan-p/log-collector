@@ -13,17 +13,17 @@ type Watcher struct {
 	Destination string              `json:"destination"`
 }
 
-func Watch(watcherSource Watcher) {
-	seekInfo := getOffset(watcherSource.FileName)
-	t, err := tail.TailFile(watcherSource.FileName, tail.Config{
+func Watch(fileName string, notificationChannel chan string) {
+	seekInfo := getOffset(fileName)
+	t, err := tail.TailFile(fileName, tail.Config{
 		Follow:   true,
 		Location: &seekInfo,
 	})
 	if err != nil {
-		log.Println("Could not tail file - ", watcherSource.FileName)
+		log.Fatalln("Could not tail file - ", fileName)
 	}
 	for line := range t.Lines {
-		log.Println(line.Text)
+		notificationChannel <- line.Text
 	}
 }
 
@@ -32,4 +32,5 @@ func getOffset(fileName string) tail.SeekInfo {
 	return tail.SeekInfo{
 		Offset: fileInfo.Size(),
 	}
+	// TODO: Add advanced offset management logic to maintain last read state
 }
