@@ -1,115 +1,35 @@
 package logcollector
 
 import (
-	"bufio"
-	"bytes"
-	"io"
 	"log"
 	"os"
 
-	"github.com/fsnotify/fsnotify"
+	"github.com/hpcloud/tail"
 )
 
 type Watcher struct {
-	FileName      string              `json:"watch"`
-	Tags          []map[string]string `json:"tags"`
-	Destination   string              `json:"destination"`
-	initialOffset int64
-}
-
-type eventHandler struct {
-	writeCh chan string
+	FileName    string              `json:"watch"`
+	Tags        []map[string]string `json:"tags"`
+	Destination string              `json:"destination"`
 }
 
 func Watch(watcherSource Watcher) {
-
-	fileInfo, _ := os.Stat(watcherSource.FileName)
-	watcherSource.initialOffset = fileInfo.Size()
-
-	watcher, err := fsnotify.NewWatcher()
+	seekInfo := getOffset(watcherSource.FileName)
+	t, err := tail.TailFile(watcherSource.FileName, tail.Config{
+		Follow:   true,
+		Location: &seekInfo,
+	})
 	if err != nil {
-		log.Println("ERROR", err)
+		log.Println("Could not tail file - ", watcherSource.FileName)
 	}
-	defer watcher.Close()
-
-	err = watcher.Add(watcherSource.FileName)
-	if err != nil {
-		log.Println("ERROR", err)
-	}
-
-	eventChan := make(chan fsnotify.Event)
-	defer close(eventChan)
-	go handleEvents(eventChan, watcherSource)
-
-	for {
-		select {
-		case event, _ := <-watcher.Events:
-			go func(e fsnotify.Event) { eventChan <- e }(event)
-
-		case err, _ := <-watcher.Errors:
-			log.Println("ERROR", err)
-		}
+	for line := range t.Lines {
+		log.Println(line.Text)
 	}
 }
 
-func handleEvents(eventCh chan fsnotify.Event, watcherSource Watcher) {
-	handler := eventHandler{
-		writeCh: make(chan string),
+func getOffset(fileName string) tail.SeekInfo {
+	fileInfo, _ := os.Stat(fileName)
+	return tail.SeekInfo{
+		Offset: fileInfo.Size(),
 	}
-	runEventActions(handler, watcherSource)
-	for event := range eventCh {
-		if event.Op&fsnotify.Write == fsnotify.Write {
-			handler.writeCh <- event.Name
-		}
-		// TODO: Handle other notfification types
-	}
-}
-
-func runEventActions(handler eventHandler, watcherSource Watcher) {
-	go actionOnWrite(handler.writeCh, watcherSource)
-	// TODO: Handle other event actions
-}
-
-func actionOnWrite(eventName chan string, watcherSource Watcher) {
-	var line string
-	currentOffset := watcherSource.initialOffset
-	for e := range eventName {
-		line, currentOffset = readLine(e, currentOffset)
-		log.Println(line)
-		// Send log to the server
-	}
-}
-
-func readLine(filename string, offset int64) (string, int64) {
-	var part []byte
-	var prefix bool
-	var line string
-	fd, err := os.Open(filename)
-	defer fd.Close()
-	if err != nil {
-		log.Fatalln("Failed to open the file")
-	}
-	_, err = fd.Seek(offset, 0)
-	if err != nil {
-		log.Fatalln("Failed to read file at given offset")
-	}
-
-	reader := bufio.NewReader(fd)
-	buffer := bytes.NewBuffer(make([]byte, 0))
-	for {
-		if part, prefix, err = reader.ReadLine(); err != nil {
-			break
-		}
-		buffer.Write(part)
-		if !prefix {
-			line = buffer.String()
-			offset = offset + int64(buffer.Len()) + 1
-			buffer.Reset()
-			break
-		}
-	}
-	if err == io.EOF {
-		err = nil
-	}
-	return line, offset
 }
