@@ -28,11 +28,7 @@ func notify(ch chan string, server ServerConnection, destination string, tags []
 }
 
 func sendToServer(notification string, server ServerConnection, destination string, tags []map[string]string, retryConfig RetryConfiguration) {
-	dest := server.Host + ":" + strconv.Itoa(server.Port)
-	conn, err := net.Dial("tcp", dest)
-	if err != nil {
-		log.Println("Could not connect to the server")
-	}
+	conn := initServerConnection(server.Host, server.Port)
 	if conn == nil {
 		log.Println("Failed to create successful connection")
 	}
@@ -40,10 +36,48 @@ func sendToServer(notification string, server ServerConnection, destination stri
 
 	commandResponse, err := initCollectRequest(conn)
 	if err != nil || !commandResponse.Begin {
-		log.Println("Failed to initiate command")
+		log.Fatalln("Failed to initiate command: ", err)
 	}
 
-	sendLog(conn, notification, destination, tags)
+	collectAck, err := sendLog(conn, notification, destination, tags)
+	if err != nil {
+		log.Fatalln("Failed to send log event: ", err)
+	}
+	if !collectAck.Ack {
+		log.Println("Did not receive log acknowledgement")
+	}
+}
+
+func initServerConnection(host string, port int) net.Conn {
+	var connectionRetryCount int
+	var conn net.Conn
+	var err error
+	dialer := &net.Dialer{
+		Timeout:   time.Second * 300,
+		KeepAlive: time.Minute * 5,
+	}
+	maxConnectionRetries := 5
+	defaultRetrySleep := time.Second * 1
+	connectionRetrySleep := defaultRetrySleep
+	dest := host + ":" + strconv.Itoa(port)
+	for connectionRetryCount < maxConnectionRetries {
+		conn, err = dialer.Dial("tcp", dest)
+		if err != nil {
+			switch e := err.(type) {
+			case net.Error:
+				if e.Temporary() {
+					connectionRetryCount++
+					time.Sleep(connectionRetrySleep)
+					continue
+				}
+				log.Fatalln("Could not connect to the server:", err)
+			default:
+				log.Fatalln("Could not connect to the server:", err)
+			}
+		}
+		break
+	}
+	return conn
 }
 
 func initCollectRequest(conn net.Conn) (CommandResponse, error) {
@@ -52,13 +86,17 @@ func initCollectRequest(conn net.Conn) (CommandResponse, error) {
 		Command: "collect",
 	}
 	if err := json.NewEncoder(conn).Encode(&commandRequest); err != nil {
-		log.Println(err)
+		return commandResponse, err
 	}
 	err := json.NewDecoder(conn).Decode(&commandResponse)
-	return commandResponse, err
+	if err != nil {
+		return commandResponse, err
+	}
+	return commandResponse, nil
 }
 
-func sendLog(conn net.Conn, notification string, destination string, tags []map[string]string) {
+func sendLog(conn net.Conn, notification string, destination string, tags []map[string]string) (CollectCmdResponse, error) {
+	var collectResp CollectCmdResponse
 	collectCmdPayload := CollectCmdPayload{
 		Record:      notification,
 		Timestamp:   time.Now().Unix(),
@@ -66,9 +104,11 @@ func sendLog(conn net.Conn, notification string, destination string, tags []map[
 		Destination: destination,
 	}
 	if err := json.NewEncoder(conn).Encode(&collectCmdPayload); err != nil {
-		log.Println(err)
+		return collectResp, err
 	}
-	var collectResp CollectCmdResponse
-	json.NewDecoder(conn).Decode(&collectResp)
-	log.Println(collectResp)
+	err := json.NewDecoder(conn).Decode(&collectResp)
+	if err != nil {
+		return collectResp, err
+	}
+	return collectResp, nil
 }
