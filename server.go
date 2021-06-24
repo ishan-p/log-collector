@@ -19,6 +19,10 @@ type ServerConnection struct {
 	SleepRetryDuration   time.Duration `json:"sleep_retry"`
 }
 
+type StorageConfig struct {
+	Filesystem FsStorageConfig `json:"filesystem"`
+}
+
 type CollectCmdPayload struct {
 	Timestamp   int64               `json:"timestamp"`
 	Tags        []map[string]string `json:"tags"`
@@ -89,11 +93,11 @@ func RunServer(configFile string) {
 			log.Println("Failed to set deadline:", err)
 			return
 		}
-		go handleConnection(conn)
+		go handleConnection(conn, config.Storage)
 	}
 }
 
-func handleConnection(conn net.Conn) {
+func handleConnection(conn net.Conn, storageConfig StorageConfig) {
 	defer func() {
 		if err := conn.Close(); err != nil {
 			log.Println("Error closing connection:", err)
@@ -124,7 +128,7 @@ func handleConnection(conn net.Conn) {
 			log.Println("Failed to initiate transaction: ", err)
 			return
 		}
-		err = handleRequest(command.Command, conn)
+		err = handleRequest(command.Command, conn, storageConfig)
 		if err != nil {
 			log.Println(err)
 			return
@@ -153,10 +157,10 @@ func beginTransaction(command string, conn net.Conn) error {
 	return nil
 }
 
-func handleRequest(activeCommand string, conn net.Conn) error {
+func handleRequest(activeCommand string, conn net.Conn, storageConfig StorageConfig) error {
 	switch activeCommand {
 	case "collect":
-		err := handleCollect(conn)
+		err := handleCollect(conn, storageConfig)
 		return err
 	default:
 		err := fmt.Errorf("Invalid command")
@@ -164,14 +168,14 @@ func handleRequest(activeCommand string, conn net.Conn) error {
 	}
 }
 
-func handleCollect(conn net.Conn) error {
+func handleCollect(conn net.Conn, storageConfig StorageConfig) error {
 	decoder := json.NewDecoder(conn)
 	var collectPayload CollectCmdPayload
 	if err := decoder.Decode(&collectPayload); err != nil {
 		log.Println("Failed to read the request")
 		return err
 	}
-	ack := collect(collectPayload)
+	ack := collect(collectPayload, storageConfig)
 	collectResponse := CollectCmdResponse{Ack: ack}
 	encoder := json.NewEncoder(conn)
 	if err := encoder.Encode(&collectResponse); err != nil {
@@ -181,7 +185,10 @@ func handleCollect(conn net.Conn) error {
 	return nil
 }
 
-func collect(record CollectCmdPayload) bool {
-	log.Println(record)
-	return true
+func collect(record CollectCmdPayload, storageConfig StorageConfig) bool {
+	if record.Destination == "filesystem" {
+		writeFs(record, storageConfig.Filesystem.BaseDir)
+		return true
+	}
+	return false
 }

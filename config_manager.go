@@ -49,6 +49,7 @@ func readClientConfigJSON(configFilePath string) ClientConfig {
 
 type ServerConfig struct {
 	ServerConnection
+	Storage StorageConfig `json:"storage"`
 }
 
 func initiateServerConfigWithDefaults() ServerConfig {
