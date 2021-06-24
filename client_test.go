@@ -8,15 +8,14 @@ import (
 )
 
 func init() {
-	go RunServer()
+	go RunServer("./tests/server.config.json")
 	time.Sleep(10 * time.Millisecond)
 }
 
 func TestServerConnection(t *testing.T) {
 	var emptyConn net.Conn
-	host := "127.0.0.1"
-	port := 8888
-	conn := initServerConnection(host, port)
+	config := readClientConfigJSON("./tests/client.config.json")
+	conn := initServerConnection(config.Collector.Host, config.Collector.Port)
 	defer conn.Close()
 	if conn == nil || conn == emptyConn {
 		log.Fatalln("Server connection failed")
@@ -24,9 +23,8 @@ func TestServerConnection(t *testing.T) {
 }
 
 func TestInitCollectRequest(t *testing.T) {
-	host := "127.0.0.1"
-	port := 8888
-	conn := initServerConnection(host, port)
+	config := readClientConfigJSON("./tests/client.config.json")
+	conn := initServerConnection(config.Collector.Host, config.Collector.Port)
 	commandResp, err := initCollectRequest(conn)
 	if err != nil {
 		log.Fatalln(err)
@@ -37,9 +35,8 @@ func TestInitCollectRequest(t *testing.T) {
 }
 
 func TestSendLog(t *testing.T) {
-	host := "127.0.0.1"
-	port := 8888
-	conn := initServerConnection(host, port)
+	config := readClientConfigJSON("./tests/client.config.json")
+	conn := initServerConnection(config.Collector.Host, config.Collector.Port)
 	commandResp, err := initCollectRequest(conn)
 	if err != nil {
 		log.Fatalln(err)

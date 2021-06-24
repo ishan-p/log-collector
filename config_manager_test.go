@@ -3,11 +3,12 @@ package logcollector
 import (
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestReadClientConfigJson(t *testing.T) {
-	configFile := "tests/sample.config.json"
-	var expectedConfig Config
+	configFile := "tests/client.config.json"
+	var expectedConfig ClientConfig
 	expectedConfig.Watchers = []Watcher{
 		{
 			FileName: "/var/log/nginx.log",
@@ -21,9 +22,12 @@ func TestReadClientConfigJson(t *testing.T) {
 		},
 	}
 	expectedConfig.Collector = ServerConnection{
-		Host:              "127.0.0.1",
-		Port:              8000,
-		ServerWaitTimeSec: 3,
+		Host:                 "127.0.0.1",
+		Port:                 8000,
+		ServerWaitTimeSec:    3,
+		ConnectionIdleTime:   45 * time.Second,
+		MaxConnectionRetries: 5,
+		SleepRetryDuration:   10 * time.Millisecond,
 	}
 	expectedConfig.RetryParams = RetryConfiguration{
 		MaxRetries:   5,
@@ -32,6 +36,26 @@ func TestReadClientConfigJson(t *testing.T) {
 
 	config := readClientConfigJSON(configFile)
 	if !reflect.DeepEqual(config, expectedConfig) {
-		t.Fatal("Client config JSON unmarshal failed!")
+		t.Fatalf("Client config JSON unmarshal failed!\n Got: \n%v\n Want: \n%v\n", config, expectedConfig)
+	}
+}
+
+func TestReadServerConfigJson(t *testing.T) {
+	configFile := "tests/server.config.json"
+	serverConnection := ServerConnection{
+		Host:                 "127.0.0.1",
+		Port:                 8000,
+		ServerWaitTimeSec:    3,
+		ConnectionIdleTime:   60 * time.Second,
+		MaxConnectionRetries: 5,
+		SleepRetryDuration:   10 * time.Millisecond,
+	}
+	expectedConfig := ServerConfig{
+		serverConnection,
+	}
+
+	config := readServerConfigJSON(configFile)
+	if !reflect.DeepEqual(config, expectedConfig) {
+		t.Fatalf("Server config JSON unmarshal failed!\n Got: \n%v\n Want: \n%v\n", config, expectedConfig)
 	}
 }
