@@ -13,6 +13,7 @@ func RunAgent(configFile string) {
 	done := make(chan bool)
 	for _, watcher := range config.Watchers {
 		log.Printf("Watching file %s\n", watcher.FileName)
+		watcher.Tags = append(watcher.Tags, map[string]string{"source_file": watcher.FileName})
 		notificationChannel := make(chan string)
 		defer close(notificationChannel)
 		go watch(watcher.FileName, notificationChannel)
