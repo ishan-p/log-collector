@@ -11,9 +11,12 @@ import (
 )
 
 type ServerConnection struct {
-	Host              string `json:"host"`
-	Port              int    `json:"port"`
-	ServerWaitTimeSec int    `json:"wait_time"`
+	Host                 string        `json:"host"`
+	Port                 int           `json:"port"`
+	ServerWaitTimeSec    int           `json:"wait_time"`
+	ConnectionIdleTime   time.Duration `json:"connection_idle_time"`
+	MaxConnectionRetries int           `json:"max_connection_retries"`
+	SleepRetryDuration   time.Duration `json:"sleep_retry"`
 }
 
 type CollectCmdPayload struct {
@@ -41,12 +44,15 @@ func defaultServerConnection() ServerConnection {
 	connection.Host = "127.0.0.1"
 	connection.Port = 8888
 	connection.ServerWaitTimeSec = 3
+	connection.ConnectionIdleTime = 45 * time.Second
+	connection.MaxConnectionRetries = 5
+	connection.SleepRetryDuration = 10 * time.Millisecond
 	return connection
 }
 
-func RunServer() {
-	port := 8888
-	src := ":" + strconv.Itoa(port)
+func RunServer(configFile string) {
+	config := readServerConfigJSON(configFile)
+	src := ":" + strconv.Itoa(config.Port)
 	listener, err := net.Listen("tcp", src)
 	if err != nil {
 		log.Fatalln(err)
@@ -55,9 +61,7 @@ func RunServer() {
 	defer listener.Close()
 
 	var connectionRetryCount int
-	maxConnectionRetries := 5
-	defaultRetrySleep := time.Millisecond * 10
-	connectionRetrySleep := defaultRetrySleep
+	connectionRetrySleep := config.SleepRetryDuration
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -65,7 +69,7 @@ func RunServer() {
 			case net.Error:
 				if e.Temporary() {
 					connectionRetryCount++
-					if connectionRetryCount > maxConnectionRetries {
+					if connectionRetryCount > config.MaxConnectionRetries {
 						log.Printf("Unable to accept connections after %d retries: %v\n", connectionRetryCount, err)
 						return
 					}
@@ -79,7 +83,11 @@ func RunServer() {
 				log.Fatalln(err)
 			}
 			connectionRetryCount = 0
-			connectionRetrySleep = defaultRetrySleep
+			connectionRetrySleep = config.SleepRetryDuration
+		}
+		if err := conn.SetDeadline(time.Now().Add(config.ConnectionIdleTime)); err != nil {
+			log.Println("Failed to set deadline:", err)
+			return
 		}
 		go handleConnection(conn)
 	}
@@ -91,12 +99,6 @@ func handleConnection(conn net.Conn) {
 			log.Println("Error closing connection:", err)
 		}
 	}()
-
-	if err := conn.SetDeadline(time.Now().Add(time.Second * 45)); err != nil {
-		log.Println("Failed to set deadline:", err)
-		return
-	}
-
 	for {
 		command, err := waitForCommand(conn)
 		if err != nil {

@@ -7,20 +7,20 @@ import (
 	"os"
 )
 
-type Config struct {
+type ClientConfig struct {
 	Watchers    []Watcher          `json:"watchers"`
 	Collector   ServerConnection   `json:"server"`
 	RetryParams RetryConfiguration `json:"retry"`
 }
 
-func initiateConfigWithDefaults() Config {
-	var config Config
+func initiateClientConfigWithDefaults() ClientConfig {
+	var config ClientConfig
 	config.Collector = defaultServerConnection()
 	config.RetryParams = defaultRetryConfiguration()
 	return config
 }
 
-func validateConfig(config Config) (bool, error) {
+func validateClientConfig(config ClientConfig) (bool, error) {
 	if len(config.Watchers) < 1 {
 		return false, errors.New("Cannot initiate agent with 0 watchers")
 	}
@@ -28,7 +28,7 @@ func validateConfig(config Config) (bool, error) {
 	return true, nil
 }
 
-func readClientConfigJSON(configFilePath string) Config {
+func readClientConfigJSON(configFilePath string) ClientConfig {
 	data, err := os.ReadFile(configFilePath)
 	if err != nil {
 		log.Fatal(err)
@@ -38,11 +38,36 @@ func readClientConfigJSON(configFilePath string) Config {
 		log.Fatal("Provided config file is an invalid JSON")
 	}
 
-	config := initiateConfigWithDefaults()
+	config := initiateClientConfigWithDefaults()
 	_ = json.Unmarshal(data, &config)
-	isValid, validationError := validateConfig(config)
+	isValid, validationError := validateClientConfig(config)
 	if !isValid {
 		log.Fatal(validationError)
 	}
+	return config
+}
+
+type ServerConfig struct {
+	ServerConnection
+}
+
+func initiateServerConfigWithDefaults() ServerConfig {
+	var config ServerConfig
+	config.ServerConnection = defaultServerConnection()
+	return config
+}
+
+func readServerConfigJSON(configFilePath string) ServerConfig {
+	data, err := os.ReadFile(configFilePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	isValidJson := json.Valid(data)
+	if !isValidJson {
+		log.Fatal("Provided config file is an invalid JSON")
+	}
+
+	config := initiateServerConfigWithDefaults()
+	_ = json.Unmarshal(data, &config)
 	return config
 }
