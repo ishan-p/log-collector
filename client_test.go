@@ -34,7 +34,7 @@ func TestInitCollectRequest(t *testing.T) {
 	}
 }
 
-func TestSendLog(t *testing.T) {
+func TestSendFilesystemLog(t *testing.T) {
 	config := readClientConfigJSON("./tests/client.config.json")
 	conn := initServerConnection(config.Collector.Host, config.Collector.Port)
 	commandResp, err := initCollectRequest(conn)
@@ -44,7 +44,7 @@ func TestSendLog(t *testing.T) {
 	if !commandResp.Begin {
 		log.Fatalln("Failed to initiate collect command")
 	}
-	collectAck, err := sendLog(conn, "test log", "S3", make([]map[string]string, 0))
+	collectAck, err := sendLog(conn, "test log", "filesystem", make([]map[string]string, 0))
 	if err != nil {
 		log.Fatalln("Failed to send log")
 	}

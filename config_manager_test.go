@@ -18,7 +18,7 @@ func TestReadClientConfigJson(t *testing.T) {
 					"value": "Nginx",
 				},
 			},
-			Destination: "S3",
+			Destination: "filesystem",
 		},
 	}
 	expectedConfig.Collector = ServerConnection{
@@ -52,6 +52,11 @@ func TestReadServerConfigJson(t *testing.T) {
 	}
 	expectedConfig := ServerConfig{
 		serverConnection,
+		StorageConfig{
+			Filesystem: FsStorageConfig{
+				BaseDir: "/tmp/collector/logs",
+			},
+		},
 	}
 
 	config := readServerConfigJSON(configFile)

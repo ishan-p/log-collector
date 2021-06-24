@@ -8,7 +8,7 @@
                     "value": "Nginx"
                 }
             ],
-            "destination": "S3"
+            "destination": "filesystem"
         }
     ],
     "server": {
