@@ -2,10 +2,12 @@ package logcollector
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"strconv"
+	"time"
 )
 
 type ServerConnection struct {
@@ -52,10 +54,32 @@ func RunServer() {
 	log.Println("Listening on ", src)
 	defer listener.Close()
 
+	var connectionRetryCount int
+	maxConnectionRetries := 5
+	defaultRetrySleep := time.Millisecond * 10
+	connectionRetrySleep := defaultRetrySleep
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Println("Connection error: ", err)
+			switch e := err.(type) {
+			case net.Error:
+				if e.Temporary() {
+					connectionRetryCount++
+					if connectionRetryCount > maxConnectionRetries {
+						log.Printf("Unable to accept connections after %d retries: %v\n", connectionRetryCount, err)
+						return
+					}
+					connectionRetrySleep *= 2
+					time.Sleep(connectionRetrySleep)
+				} else {
+					log.Fatalln(err)
+				}
+			default:
+				conn.Close()
+				log.Fatalln(err)
+			}
+			connectionRetryCount = 0
+			connectionRetrySleep = defaultRetrySleep
 		}
 		go handleConnection(conn)
 	}
@@ -64,21 +88,45 @@ func RunServer() {
 func handleConnection(conn net.Conn) {
 	defer func() {
 		if err := conn.Close(); err != nil {
-			log.Println("error closing connection:", err)
+			log.Println("Error closing connection:", err)
 		}
 	}()
+
+	if err := conn.SetDeadline(time.Now().Add(time.Second * 45)); err != nil {
+		log.Println("Failed to set deadline:", err)
+		return
+	}
 
 	for {
 		command, err := waitForCommand(conn)
 		if err != nil {
-			if err == io.EOF {
-				log.Println("Closing connection")
-				break
+			switch e := err.(type) {
+			case net.Error:
+				if e.Timeout() {
+					log.Println("Timeout - Did not recieve a request from the client. Closing connection.")
+				}
+				log.Println(err)
+				return
+			default:
+				if err == io.EOF {
+					log.Println("Closing connection on client's request")
+					return
+				} else {
+					log.Println(err)
+					continue
+				}
 			}
-			log.Println(err)
 		}
-		beginTransaction(command.Command, conn)
-		handleRequest(command.Command, conn)
+		err = beginTransaction(command.Command, conn)
+		if err != nil {
+			log.Println("Failed to initiate transaction: ", err)
+			return
+		}
+		err = handleRequest(command.Command, conn)
+		if err != nil {
+			log.Println(err)
+			return
+		}
 	}
 }
 
@@ -91,38 +139,44 @@ func waitForCommand(conn net.Conn) (CommandRequest, error) {
 	return request, nil
 }
 
-func beginTransaction(command string, conn net.Conn) {
+func beginTransaction(command string, conn net.Conn) error {
 	initRequest := CommandResponse{
 		Command: command,
 		Begin:   true,
 	}
 	encoder := json.NewEncoder(conn)
 	if err := encoder.Encode(&initRequest); err != nil {
-		log.Println(err)
+		return err
 	}
+	return nil
 }
 
-func handleRequest(activeCommand string, conn net.Conn) {
+func handleRequest(activeCommand string, conn net.Conn) error {
 	switch activeCommand {
 	case "collect":
-		handleCollect(conn)
+		err := handleCollect(conn)
+		return err
 	default:
-		log.Println("Unrecognized command")
+		err := fmt.Errorf("Invalid command")
+		return err
 	}
 }
 
-func handleCollect(conn net.Conn) {
+func handleCollect(conn net.Conn) error {
 	decoder := json.NewDecoder(conn)
 	var collectPayload CollectCmdPayload
 	if err := decoder.Decode(&collectPayload); err != nil {
-		log.Println(err)
+		log.Println("Failed to read the request")
+		return err
 	}
 	ack := collect(collectPayload)
 	collectResponse := CollectCmdResponse{Ack: ack}
 	encoder := json.NewEncoder(conn)
 	if err := encoder.Encode(&collectResponse); err != nil {
-		log.Println(err)
+		log.Println("Failed to send the ack")
+		return err
 	}
+	return nil
 }
 
 func collect(record CollectCmdPayload) bool {
