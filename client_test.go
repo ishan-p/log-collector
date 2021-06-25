@@ -15,16 +15,16 @@ func init() {
 func TestServerConnection(t *testing.T) {
 	var emptyConn net.Conn
 	config := readClientConfigJSON("./tests/client.config.json")
-	conn := initServerConnection(config.Collector.Host, config.Collector.Port)
+	conn, err := initServerConnection(config.Collector.Host, config.Collector.Port)
 	defer conn.Close()
-	if conn == nil || conn == emptyConn {
+	if conn == nil || conn == emptyConn || err != nil {
 		log.Fatalln("Server connection failed")
 	}
 }
 
 func TestInitCollectRequest(t *testing.T) {
 	config := readClientConfigJSON("./tests/client.config.json")
-	conn := initServerConnection(config.Collector.Host, config.Collector.Port)
+	conn, _ := initServerConnection(config.Collector.Host, config.Collector.Port)
 	commandResp, err := initCollectRequest(conn)
 	if err != nil {
 		log.Fatalln(err)
@@ -36,7 +36,7 @@ func TestInitCollectRequest(t *testing.T) {
 
 func TestSendFilesystemLog(t *testing.T) {
 	config := readClientConfigJSON("./tests/client.config.json")
-	conn := initServerConnection(config.Collector.Host, config.Collector.Port)
+	conn, _ := initServerConnection(config.Collector.Host, config.Collector.Port)
 	commandResp, err := initCollectRequest(conn)
 	if err != nil {
 		log.Fatalln(err)

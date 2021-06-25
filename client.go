@@ -20,18 +20,21 @@ type Notification struct {
 func RunAgent(configFile string) {
 	config := readClientConfigJSON(configFile)
 	done := make(chan bool)
+	retryChannel := make(chan Notification)
+	go retryMangager(retryChannel, config.Collector, config.RetryParams)
+	defer close(retryChannel)
 	for _, watcher := range config.Watchers {
 		log.Printf("Watching file %s\n", watcher.FileName)
 		watcher.Tags = append(watcher.Tags, map[string]string{"source_file": watcher.FileName})
 		notificationChannel := make(chan string)
 		defer close(notificationChannel)
 		go watch(watcher.FileName, notificationChannel)
-		go notify(notificationChannel, config.Collector, watcher.Destination, watcher.Tags)
+		go notify(notificationChannel, config.Collector, watcher.Destination, watcher.Tags, retryChannel)
 	}
 	<-done
 }
 
-func notify(ch chan string, server ServerConnection, destination string, tags []map[string]string) {
+func notify(ch chan string, server ServerConnection, destination string, tags []map[string]string, retryChannel chan Notification) {
 	for event := range ch {
 		notification := Notification{
 			LogEvent:     event,
@@ -41,32 +44,41 @@ func notify(ch chan string, server ServerConnection, destination string, tags []
 			RetryAttempt: 0,
 			LastRetry:    time.Now().Unix(),
 		}
-		sendToServer(notification, server)
+		sendToServer(notification, server, retryChannel)
 	}
 }
 
-func sendToServer(notification Notification, server ServerConnection) {
-	conn := initServerConnection(server.Host, server.Port)
-	if conn == nil {
+func sendToServer(notification Notification, server ServerConnection, retryChannel chan Notification) {
+	conn, err := initServerConnection(server.Host, server.Port)
+	if conn == nil || err != nil {
 		log.Println("Failed to create successful connection")
+		retryChannel <- notification
+		return
+	} else {
+		defer conn.Close()
 	}
-	defer conn.Close()
 
 	commandResponse, err := initCollectRequest(conn)
 	if err != nil || !commandResponse.Begin {
-		log.Fatalln("Failed to initiate command: ", err)
+		log.Println("Failed to initiate command: ", err)
+		retryChannel <- notification
+		return
 	}
 
 	collectAck, err := sendLog(conn, notification)
 	if err != nil {
-		log.Fatalln("Failed to send log event: ", err)
+		log.Println("Failed to send log event: ", err)
+		retryChannel <- notification
+		return
 	}
 	if !collectAck.Ack {
 		log.Println("Did not receive log acknowledgement")
+		retryChannel <- notification
+		return
 	}
 }
 
-func initServerConnection(host string, port int) net.Conn {
+func initServerConnection(host string, port int) (net.Conn, error) {
 	var connectionRetryCount int
 	var conn net.Conn
 	var err error
@@ -88,14 +100,14 @@ func initServerConnection(host string, port int) net.Conn {
 					time.Sleep(connectionRetrySleep)
 					continue
 				}
-				log.Fatalln("Could not connect to the server:", err)
+				log.Println("Could not connect to the server:", err)
 			default:
-				log.Fatalln("Could not connect to the server:", err)
+				log.Println("Could not connect to the server:", err)
 			}
 		}
 		break
 	}
-	return conn
+	return conn, err
 }
 
 func initCollectRequest(conn net.Conn) (CommandResponse, error) {
