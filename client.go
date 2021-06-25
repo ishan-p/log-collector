@@ -8,6 +8,15 @@ import (
 	"time"
 )
 
+type Notification struct {
+	LogEvent     string
+	Timestamp    int64
+	Tags         []map[string]string
+	Destination  string
+	RetryAttempt int
+	LastRetry    int64
+}
+
 func RunAgent(configFile string) {
 	config := readClientConfigJSON(configFile)
 	done := make(chan bool)
@@ -17,18 +26,26 @@ func RunAgent(configFile string) {
 		notificationChannel := make(chan string)
 		defer close(notificationChannel)
 		go watch(watcher.FileName, notificationChannel)
-		go notify(notificationChannel, config.Collector, watcher.Destination, watcher.Tags, config.RetryParams)
+		go notify(notificationChannel, config.Collector, watcher.Destination, watcher.Tags)
 	}
 	<-done
 }
 
-func notify(ch chan string, server ServerConnection, destination string, tags []map[string]string, retryConfig RetryConfiguration) {
-	for notification := range ch {
-		sendToServer(notification, server, destination, tags, retryConfig)
+func notify(ch chan string, server ServerConnection, destination string, tags []map[string]string) {
+	for event := range ch {
+		notification := Notification{
+			LogEvent:     event,
+			Timestamp:    time.Now().Unix(),
+			Tags:         tags,
+			Destination:  destination,
+			RetryAttempt: 0,
+			LastRetry:    time.Now().Unix(),
+		}
+		sendToServer(notification, server)
 	}
 }
 
-func sendToServer(notification string, server ServerConnection, destination string, tags []map[string]string, retryConfig RetryConfiguration) {
+func sendToServer(notification Notification, server ServerConnection) {
 	conn := initServerConnection(server.Host, server.Port)
 	if conn == nil {
 		log.Println("Failed to create successful connection")
@@ -40,7 +57,7 @@ func sendToServer(notification string, server ServerConnection, destination stri
 		log.Fatalln("Failed to initiate command: ", err)
 	}
 
-	collectAck, err := sendLog(conn, notification, destination, tags)
+	collectAck, err := sendLog(conn, notification)
 	if err != nil {
 		log.Fatalln("Failed to send log event: ", err)
 	}
@@ -96,13 +113,13 @@ func initCollectRequest(conn net.Conn) (CommandResponse, error) {
 	return commandResponse, nil
 }
 
-func sendLog(conn net.Conn, notification string, destination string, tags []map[string]string) (CollectCmdResponse, error) {
+func sendLog(conn net.Conn, notification Notification) (CollectCmdResponse, error) {
 	var collectResp CollectCmdResponse
 	collectCmdPayload := CollectCmdPayload{
-		Record:      notification,
-		Timestamp:   time.Now().Unix(),
-		Tags:        tags,
-		Destination: destination,
+		Record:      notification.LogEvent,
+		Timestamp:   notification.Timestamp,
+		Tags:        notification.Tags,
+		Destination: notification.Destination,
 	}
 	if err := json.NewEncoder(conn).Encode(&collectCmdPayload); err != nil {
 		return collectResp, err

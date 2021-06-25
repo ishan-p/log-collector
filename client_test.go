@@ -44,7 +44,12 @@ func TestSendFilesystemLog(t *testing.T) {
 	if !commandResp.Begin {
 		log.Fatalln("Failed to initiate collect command")
 	}
-	collectAck, err := sendLog(conn, "test log", "filesystem", make([]map[string]string, 0))
+	notification := Notification{
+		LogEvent:    "test log",
+		Destination: "filesystem",
+		Timestamp:   time.Now().Unix(),
+	}
+	collectAck, err := sendLog(conn, notification)
 	if err != nil {
 		log.Fatalln("Failed to send log")
 	}
