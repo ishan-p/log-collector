@@ -21,6 +21,7 @@ type ServerConnection struct {
 
 type StorageConfig struct {
 	Filesystem FsStorageConfig `json:"filesystem"`
+	S3         S3StorageConfig `json:"s3"`
 }
 
 type CollectCmdPayload struct {
@@ -188,6 +189,9 @@ func handleCollect(conn net.Conn, storageConfig StorageConfig) error {
 func collect(record CollectCmdPayload, storageConfig StorageConfig) bool {
 	if record.Destination == "filesystem" {
 		writeFs(record, storageConfig.Filesystem.BaseDir)
+		return true
+	} else if record.Destination == "s3" {
+		writeS3(record, storageConfig.S3.FirehosStream, storageConfig.S3.AWSRegion)
 		return true
 	}
 	return false
