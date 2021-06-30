@@ -1,4 +1,4 @@
-package logcollector
+package server
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/firehose"
+	serverConfig "github.com/ishan-p/log-collector/internal/config"
 )
 
 type S3StorageConfig struct {
@@ -14,7 +15,7 @@ type S3StorageConfig struct {
 	AWSRegion     string `json:"aws_region"`
 }
 
-func writeS3(logEvent CollectCmdPayload, firehoseStream string, awsRegion string) {
+func writeS3(logEvent serverConfig.CollectCmdPayload, firehoseStream string, awsRegion string) {
 	sess := session.Must(session.NewSession())
 	firehoseService := firehose.New(sess, aws.NewConfig().WithRegion(awsRegion))
 

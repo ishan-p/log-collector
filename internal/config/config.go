@@ -1,4 +1,4 @@
-package logcollector
+package config
 
 import (
 	"encoding/json"
@@ -8,9 +8,9 @@ import (
 )
 
 type ClientConfig struct {
-	Watchers    []Watcher          `json:"watchers"`
-	Collector   ServerConnection   `json:"server"`
-	RetryParams RetryConfiguration `json:"retry"`
+	Watchers    []WatcherConfig `json:"watchers"`
+	Collector   CollectorConfig `json:"server"`
+	RetryParams RetryConfig     `json:"retry"`
 }
 
 func initiateClientConfigWithDefaults() ClientConfig {
@@ -28,7 +28,7 @@ func validateClientConfig(config ClientConfig) (bool, error) {
 	return true, nil
 }
 
-func readClientConfigJSON(configFilePath string) ClientConfig {
+func ReadClientConfigJSON(configFilePath string) ClientConfig {
 	data, err := os.ReadFile(configFilePath)
 	if err != nil {
 		log.Fatal(err)
@@ -48,17 +48,17 @@ func readClientConfigJSON(configFilePath string) ClientConfig {
 }
 
 type ServerConfig struct {
-	ServerConnection
+	CollectorConfig
 	Storage StorageConfig `json:"storage"`
 }
 
 func initiateServerConfigWithDefaults() ServerConfig {
 	var config ServerConfig
-	config.ServerConnection = defaultServerConnection()
+	config.CollectorConfig = defaultServerConnection()
 	return config
 }
 
-func readServerConfigJSON(configFilePath string) ServerConfig {
+func ReadServerConfigJSON(configFilePath string) ServerConfig {
 	data, err := os.ReadFile(configFilePath)
 	if err != nil {
 		log.Fatal(err)
