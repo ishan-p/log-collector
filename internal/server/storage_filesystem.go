@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	serverConfig "github.com/ishan-p/log-collector/internal/config"
+	"github.com/ishan-p/log-collector/internal/schema"
 )
 
 type FsStorageConfig struct {
@@ -33,7 +33,7 @@ func createDirIfNotExists(dir string) error {
 	return nil
 }
 
-func writeFs(logEvent serverConfig.CollectCmdPayload, baseDir string) {
+func writeFs(logEvent schema.CollectCmdPayload, baseDir string) {
 	subDir := getSubDir()
 	dir := filepath.Join(baseDir, subDir)
 	createDirIfNotExists(dir)

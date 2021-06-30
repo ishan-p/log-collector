@@ -1,4 +1,4 @@
-package config
+package schema
 
 type CollectCmdPayload struct {
 	Timestamp   int64               `json:"timestamp"`

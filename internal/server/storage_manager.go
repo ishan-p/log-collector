@@ -1,10 +1,10 @@
 package server
 
 import (
-	serverConfig "github.com/ishan-p/log-collector/internal/config"
+	"github.com/ishan-p/log-collector/internal/schema"
 )
 
-func collect(record serverConfig.CollectCmdPayload, storageConfig serverConfig.StorageConfig) bool {
+func collect(record schema.CollectCmdPayload, storageConfig schema.StorageConfig) bool {
 	if record.Destination == "filesystem" {
 		writeFs(record, storageConfig.Filesystem.BaseDir)
 		return true

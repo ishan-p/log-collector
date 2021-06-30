@@ -9,11 +9,12 @@ import (
 	"strconv"
 	"time"
 
-	serverConfig "github.com/ishan-p/log-collector/internal/config"
+	serverConfig "github.com/ishan-p/log-collector/internal/config/server"
+	"github.com/ishan-p/log-collector/internal/schema"
 )
 
 func Run(configFile string) {
-	config := serverConfig.ReadServerConfigJSON(configFile)
+	config := serverConfig.ReadJSON(configFile)
 	src := ":" + strconv.Itoa(config.Port)
 	listener, err := net.Listen("tcp", src)
 	if err != nil {
@@ -55,7 +56,7 @@ func Run(configFile string) {
 	}
 }
 
-func handleConnection(conn net.Conn, storageConfig serverConfig.StorageConfig) {
+func handleConnection(conn net.Conn, storageConfig schema.StorageConfig) {
 	defer func() {
 		if err := conn.Close(); err != nil {
 			log.Println("Error closing connection:", err)
@@ -94,9 +95,9 @@ func handleConnection(conn net.Conn, storageConfig serverConfig.StorageConfig) {
 	}
 }
 
-func waitForCommand(conn net.Conn) (serverConfig.CommandRequest, error) {
+func waitForCommand(conn net.Conn) (schema.CommandRequest, error) {
 	decoder := json.NewDecoder(conn)
-	var request serverConfig.CommandRequest
+	var request schema.CommandRequest
 	if err := decoder.Decode(&request); err != nil {
 		return request, err
 	}
@@ -104,7 +105,7 @@ func waitForCommand(conn net.Conn) (serverConfig.CommandRequest, error) {
 }
 
 func beginTransaction(command string, conn net.Conn) error {
-	initRequest := serverConfig.CommandResponse{
+	initRequest := schema.CommandResponse{
 		Command: command,
 		Begin:   true,
 	}
@@ -115,7 +116,7 @@ func beginTransaction(command string, conn net.Conn) error {
 	return nil
 }
 
-func handleRequest(activeCommand string, conn net.Conn, storageConfig serverConfig.StorageConfig) error {
+func handleRequest(activeCommand string, conn net.Conn, storageConfig schema.StorageConfig) error {
 	switch activeCommand {
 	case "collect":
 		err := handleCollect(conn, storageConfig)

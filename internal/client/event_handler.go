@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	config "github.com/ishan-p/log-collector/internal/config"
+	"github.com/ishan-p/log-collector/internal/schema"
 )
 
 type ServerConnection struct {
@@ -16,7 +16,7 @@ type ServerConnection struct {
 	ServerWaitTimeSec int    `json:"wait_time"`
 }
 
-func sendToServer(notification Notification, server config.CollectorConfig, retryChannel chan Notification) {
+func sendToServer(notification Notification, server schema.CollectorConfig, retryChannel chan Notification) {
 	conn, err := initServerConnection(server.Host, server.Port)
 	if conn == nil || err != nil {
 		log.Println("Failed to create successful connection")
@@ -78,9 +78,9 @@ func initServerConnection(host string, port int) (net.Conn, error) {
 	return conn, err
 }
 
-func initCollectRequest(conn net.Conn) (config.CommandResponse, error) {
-	var commandResponse config.CommandResponse
-	commandRequest := config.CommandRequest{
+func initCollectRequest(conn net.Conn) (schema.CommandResponse, error) {
+	var commandResponse schema.CommandResponse
+	commandRequest := schema.CommandRequest{
 		Command: "collect",
 	}
 	if err := json.NewEncoder(conn).Encode(&commandRequest); err != nil {
@@ -93,9 +93,9 @@ func initCollectRequest(conn net.Conn) (config.CommandResponse, error) {
 	return commandResponse, nil
 }
 
-func sendLog(conn net.Conn, notification Notification) (config.CollectCmdResponse, error) {
-	var collectResp config.CollectCmdResponse
-	collectCmdPayload := config.CollectCmdPayload{
+func sendLog(conn net.Conn, notification Notification) (schema.CollectCmdResponse, error) {
+	var collectResp schema.CollectCmdResponse
+	collectCmdPayload := schema.CollectCmdPayload{
 		Record:      notification.LogEvent,
 		Timestamp:   notification.Timestamp,
 		Tags:        notification.Tags,
