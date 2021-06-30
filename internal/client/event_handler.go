@@ -1,4 +1,4 @@
-package logcollector
+package client
 
 import (
 	"encoding/json"
@@ -6,49 +6,17 @@ import (
 	"net"
 	"strconv"
 	"time"
+
+	config "github.com/ishan-p/log-collector/internal/config"
 )
 
-type Notification struct {
-	LogEvent     string
-	Timestamp    int64
-	Tags         []map[string]string
-	Destination  string
-	RetryAttempt int
-	LastRetry    int64
+type ServerConnection struct {
+	Host              string `json:"host"`
+	Port              int    `json:"port"`
+	ServerWaitTimeSec int    `json:"wait_time"`
 }
 
-func RunAgent(configFile string) {
-	config := readClientConfigJSON(configFile)
-	done := make(chan bool)
-	retryChannel := make(chan Notification)
-	go retryMangager(retryChannel, config.Collector, config.RetryParams)
-	defer close(retryChannel)
-	for _, watcher := range config.Watchers {
-		log.Printf("Watching file %s\n", watcher.FileName)
-		watcher.Tags = append(watcher.Tags, map[string]string{"source_file": watcher.FileName})
-		notificationChannel := make(chan string)
-		defer close(notificationChannel)
-		go watch(watcher.FileName, notificationChannel)
-		go notify(notificationChannel, config.Collector, watcher.Destination, watcher.Tags, retryChannel)
-	}
-	<-done
-}
-
-func notify(ch chan string, server ServerConnection, destination string, tags []map[string]string, retryChannel chan Notification) {
-	for event := range ch {
-		notification := Notification{
-			LogEvent:     event,
-			Timestamp:    time.Now().Unix(),
-			Tags:         tags,
-			Destination:  destination,
-			RetryAttempt: 0,
-			LastRetry:    time.Now().Unix(),
-		}
-		sendToServer(notification, server, retryChannel)
-	}
-}
-
-func sendToServer(notification Notification, server ServerConnection, retryChannel chan Notification) {
+func sendToServer(notification Notification, server config.CollectorConfig, retryChannel chan Notification) {
 	conn, err := initServerConnection(server.Host, server.Port)
 	if conn == nil || err != nil {
 		log.Println("Failed to create successful connection")
@@ -110,9 +78,9 @@ func initServerConnection(host string, port int) (net.Conn, error) {
 	return conn, err
 }
 
-func initCollectRequest(conn net.Conn) (CommandResponse, error) {
-	var commandResponse CommandResponse
-	commandRequest := CommandRequest{
+func initCollectRequest(conn net.Conn) (config.CommandResponse, error) {
+	var commandResponse config.CommandResponse
+	commandRequest := config.CommandRequest{
 		Command: "collect",
 	}
 	if err := json.NewEncoder(conn).Encode(&commandRequest); err != nil {
@@ -125,9 +93,9 @@ func initCollectRequest(conn net.Conn) (CommandResponse, error) {
 	return commandResponse, nil
 }
 
-func sendLog(conn net.Conn, notification Notification) (CollectCmdResponse, error) {
-	var collectResp CollectCmdResponse
-	collectCmdPayload := CollectCmdPayload{
+func sendLog(conn net.Conn, notification Notification) (config.CollectCmdResponse, error) {
+	var collectResp config.CollectCmdResponse
+	collectCmdPayload := config.CollectCmdPayload{
 		Record:      notification.LogEvent,
 		Timestamp:   notification.Timestamp,
 		Tags:        notification.Tags,

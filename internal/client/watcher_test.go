@@ -1,4 +1,4 @@
-package logcollector
+package client
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 func TestWatcherWriteReadCount(t *testing.T) {
 	logEntries := 1000
 	watchTimeout := time.Duration(5)
-	logFile := "tests/sample.log"
+	logFile := "../../tests/sample.log"
 	notificationChannel := make(chan string)
 	go watch(logFile, notificationChannel)
 

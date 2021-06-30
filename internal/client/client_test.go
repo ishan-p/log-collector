@@ -1,20 +1,23 @@
-package logcollector
+package client
 
 import (
 	"log"
 	"net"
 	"testing"
 	"time"
+
+	clientconfig "github.com/ishan-p/log-collector/internal/config"
+	"github.com/ishan-p/log-collector/internal/server"
 )
 
 func init() {
-	go RunServer("./tests/server.config.json")
+	go server.Run("../../tests/server.config.json")
 	time.Sleep(10 * time.Millisecond)
 }
 
 func TestServerConnection(t *testing.T) {
 	var emptyConn net.Conn
-	config := readClientConfigJSON("./tests/client.config.json")
+	config := clientconfig.ReadClientConfigJSON("../../tests/client.config.json")
 	conn, err := initServerConnection(config.Collector.Host, config.Collector.Port)
 	defer conn.Close()
 	if conn == nil || conn == emptyConn || err != nil {
@@ -23,7 +26,7 @@ func TestServerConnection(t *testing.T) {
 }
 
 func TestInitCollectRequest(t *testing.T) {
-	config := readClientConfigJSON("./tests/client.config.json")
+	config := clientconfig.ReadClientConfigJSON("../../tests/client.config.json")
 	conn, _ := initServerConnection(config.Collector.Host, config.Collector.Port)
 	commandResp, err := initCollectRequest(conn)
 	if err != nil {
@@ -35,7 +38,7 @@ func TestInitCollectRequest(t *testing.T) {
 }
 
 func TestSendFilesystemLog(t *testing.T) {
-	config := readClientConfigJSON("./tests/client.config.json")
+	config := clientconfig.ReadClientConfigJSON("../../tests/client.config.json")
 	conn, _ := initServerConnection(config.Collector.Host, config.Collector.Port)
 	commandResp, err := initCollectRequest(conn)
 	if err != nil {

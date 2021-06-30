@@ -1,22 +1,12 @@
-package logcollector
+package client
 
 import (
 	"log"
 	"sync"
 	"time"
+
+	config "github.com/ishan-p/log-collector/internal/config"
 )
-
-type RetryConfiguration struct {
-	MaxRetries   int `json:"max_retries"`
-	MaxQueueSize int `json:"max_queue_size"`
-}
-
-func defaultRetryConfiguration() RetryConfiguration {
-	var retryConfig RetryConfiguration
-	retryConfig.MaxQueueSize = 500
-	retryConfig.MaxRetries = 3
-	return retryConfig
-}
 
 type RetryManager struct {
 	MaxRetries   int
@@ -25,7 +15,7 @@ type RetryManager struct {
 	mu           sync.Mutex
 }
 
-func (manager *RetryManager) retry(retryCh chan Notification, server ServerConnection) {
+func (manager *RetryManager) retry(retryCh chan Notification, server config.CollectorConfig) {
 	for {
 		var currentRetryItem Notification
 		manager.mu.Lock()
@@ -49,7 +39,7 @@ func (manager *RetryManager) retry(retryCh chan Notification, server ServerConne
 	}
 }
 
-func retryMangager(retryCh chan Notification, server ServerConnection, retryConfig RetryConfiguration) {
+func retryMangager(retryCh chan Notification, server config.CollectorConfig, retryConfig config.RetryConfig) {
 	manager := RetryManager{
 		MaxRetries:   retryConfig.MaxRetries,
 		MaxQueueSize: retryConfig.MaxQueueSize,

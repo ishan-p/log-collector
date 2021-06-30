@@ -1,8 +1,7 @@
-package logcollector
+package client
 
 import (
 	"log"
-	"os"
 
 	"github.com/hpcloud/tail"
 )
@@ -25,12 +24,4 @@ func watch(fileName string, notificationChannel chan string) {
 	for line := range t.Lines {
 		notificationChannel <- line.Text
 	}
-}
-
-func getOffset(fileName string) tail.SeekInfo {
-	fileInfo, _ := os.Stat(fileName)
-	return tail.SeekInfo{
-		Offset: fileInfo.Size(),
-	}
-	// TODO: Add advanced offset management logic to maintain last read state
 }
