@@ -3,7 +3,7 @@ package client
 import (
 	"time"
 
-	config "github.com/ishan-p/log-collector/internal/config"
+	"github.com/ishan-p/log-collector/internal/schema"
 )
 
 type Notification struct {
@@ -15,7 +15,7 @@ type Notification struct {
 	LastRetry    int64
 }
 
-func notify(ch chan string, server config.CollectorConfig, destination string, tags []map[string]string, retryChannel chan Notification) {
+func notify(ch chan string, server schema.CollectorConfig, destination string, tags []map[string]string, retryChannel chan Notification) {
 	for event := range ch {
 		notification := Notification{
 			LogEvent:     event,

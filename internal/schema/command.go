@@ -1,21 +1,20 @@
-package config
+package schema
 
-type CollectCmdPayload struct {
+type CommandConatiner map[string]interface{}
+
+var CollectCmd string
+
+type CollectRequest struct {
 	Timestamp   int64               `json:"timestamp"`
 	Tags        []map[string]string `json:"tags"`
 	Record      string              `json:"record"`
 	Destination string              `json:"destination"`
 }
 
-type CollectCmdResponse struct {
+type CollectResponse struct {
 	Ack bool `json:"ack"`
 }
 
-type CommandRequest struct {
-	Command string `json:"cmd"`
-}
-
-type CommandResponse struct {
-	Command string `json:"cmd"`
-	Begin   bool   `json:"begin"`
+func init() {
+	CollectCmd = "collect"
 }

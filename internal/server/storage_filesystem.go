@@ -1,19 +1,39 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"time"
-
-	serverConfig "github.com/ishan-p/log-collector/internal/config"
 )
 
 type FsStorageConfig struct {
 	BaseDir string `json:"base_dir"`
+}
+
+type FileStore struct {
+	FsStorageConfig
+}
+
+func NewFileStore(baseDir string) FileStore {
+	fsConfig := FsStorageConfig{
+		BaseDir: baseDir,
+	}
+	fs := FileStore{
+		fsConfig,
+	}
+	return fs
+}
+
+func (fs FileStore) write(data []byte) (bool, error) {
+	subDir := getSubDir()
+	dir := filepath.Join(fs.BaseDir, subDir)
+	createDirIfNotExists(dir)
+	fileName := "collector.log"
+	appendLog(filepath.Join(dir, fileName), string(data))
+	return true, nil
 }
 
 func getSubDir() string {
@@ -31,20 +51,6 @@ func createDirIfNotExists(dir string) error {
 		}
 	}
 	return nil
-}
-
-func writeFs(logEvent serverConfig.CollectCmdPayload, baseDir string) {
-	subDir := getSubDir()
-	dir := filepath.Join(baseDir, subDir)
-	createDirIfNotExists(dir)
-
-	jsonLogEvent, err := json.Marshal(logEvent)
-	if err != nil {
-		log.Println("Unable to encode log as json")
-	}
-
-	fileName := "collector.log"
-	appendLog(filepath.Join(dir, fileName), string(jsonLogEvent))
 }
 
 func appendLog(filePath string, data string) {

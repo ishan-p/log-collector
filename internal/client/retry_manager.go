@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	config "github.com/ishan-p/log-collector/internal/config"
+	"github.com/ishan-p/log-collector/internal/schema"
 )
 
 type RetryManager struct {
@@ -15,7 +15,7 @@ type RetryManager struct {
 	mu           sync.Mutex
 }
 
-func (manager *RetryManager) retry(retryCh chan Notification, server config.CollectorConfig) {
+func (manager *RetryManager) retry(retryCh chan Notification, server schema.CollectorConfig) {
 	for {
 		var currentRetryItem Notification
 		manager.mu.Lock()
@@ -39,7 +39,7 @@ func (manager *RetryManager) retry(retryCh chan Notification, server config.Coll
 	}
 }
 
-func retryMangager(retryCh chan Notification, server config.CollectorConfig, retryConfig config.RetryConfig) {
+func retryMangager(retryCh chan Notification, server schema.CollectorConfig, retryConfig schema.RetryConfig) {
 	manager := RetryManager{
 		MaxRetries:   retryConfig.MaxRetries,
 		MaxQueueSize: retryConfig.MaxQueueSize,

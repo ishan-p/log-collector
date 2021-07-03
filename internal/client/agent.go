@@ -3,15 +3,11 @@ package client
 import (
 	"log"
 
-	clientconfig "github.com/ishan-p/log-collector/internal/config"
+	clientConfig "github.com/ishan-p/log-collector/internal/config/client"
 )
 
-type agent struct {
-	retryChannel chan Notification
-}
-
 func Run(configFile string) {
-	config := clientconfig.ReadClientConfigJSON(configFile)
+	config := clientConfig.ReadJSON(configFile)
 	done := make(chan bool)
 	retryChannel := make(chan Notification)
 	go retryMangager(retryChannel, config.Collector, config.RetryParams)
