@@ -6,10 +6,6 @@ import (
 	clientConfig "github.com/ishan-p/log-collector/internal/config/client"
 )
 
-type agent struct {
-	retryChannel chan Notification
-}
-
 func Run(configFile string) {
 	config := clientConfig.ReadJSON(configFile)
 	done := make(chan bool)
