@@ -8,17 +8,31 @@ import (
 	"github.com/ishan-p/log-collector/internal/schema"
 )
 
-func handleCollect(conn net.Conn, storageConfig schema.StorageConfig) error {
-	decoder := json.NewDecoder(conn)
-	var collectPayload schema.CollectCmdPayload
-	if err := decoder.Decode(&collectPayload); err != nil {
-		log.Println("Failed to read the request")
-		return err
+type CollectCommand schema.CollectRequest
+
+func (cmd CollectCommand) Execute(handler RequestHandler) (ExecutionStatus, error) {
+	storer, err := NewStorer(cmd.Destination, handler.Config.Storage)
+	if err != nil {
+		log.Println(err)
+		return false, err
 	}
-	ack := collect(collectPayload, storageConfig)
-	collectResponse := schema.CollectCmdResponse{Ack: ack}
+	jsonLogEvent, err := json.Marshal(cmd)
+	if err != nil {
+		log.Println("Unable to encode log as json")
+		return false, err
+	}
+	status, err := storer.write(jsonLogEvent)
+	if err != nil {
+		log.Println(err)
+		return ExecutionStatus(status), err
+	}
+	return ExecutionStatus(status), nil
+}
+
+func (cmd CollectCommand) Reply(conn net.Conn, status ExecutionStatus) error {
+	response := schema.CollectResponse{Ack: bool(status)}
 	encoder := json.NewEncoder(conn)
-	if err := encoder.Encode(&collectResponse); err != nil {
+	if err := encoder.Encode(&response); err != nil {
 		log.Println("Failed to send the ack")
 		return err
 	}
